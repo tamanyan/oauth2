@@ -1,0 +1,144 @@
+package store_test
+
+import (
+	"testing"
+	"time"
+
+	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/tamanyan/oauth2"
+	"github.com/tamanyan/oauth2/models"
+	"github.com/tamanyan/oauth2/store"
+)
+
+func TestTokenStore(t *testing.T) {
+	Convey("Test memory store", t, func() {
+		store, err := store.NewTokenStore(&store.TokenConfig{
+			DSN:         ":memory:",
+			DBType:      "sqlite3",
+			TableName:   "oauth2_token",
+			MaxLifetime: time.Second * 1,
+		}, 600)
+		So(err, ShouldBeNil)
+		testToken(store)
+		store.Close()
+	})
+
+	// Convey("Test file store", t, func() {
+	// 	os.Remove("data.db")
+
+	// 	store, err := store.NewTokenStore(&store.TokenConfig{
+	// 		DSN:         "data.db",
+	// 		DBType:      "sqlite3",
+	// 		TableName:   "oauth2_token",
+	// 		MaxLifetime: time.Second * 1,
+	// 	}, 2)
+	// 	So(err, ShouldBeNil)
+	// 	testToken(store)
+	// })
+}
+
+func testToken(store oauth2.TokenStore) {
+	Convey("Test authorization code store", func() {
+		info := &models.Token{
+			ClientID:      "1",
+			UserID:        "1_1",
+			RedirectURI:   "http://localhost/",
+			Scope:         "all",
+			Code:          "11_11_11",
+			CodeCreateAt:  time.Now(),
+			CodeExpiresIn: time.Second * 5,
+		}
+		err := store.Create(info)
+		So(err, ShouldBeNil)
+
+		cinfo, err := store.GetByCode(info.Code)
+		So(err, ShouldBeNil)
+		So(cinfo.GetUserID(), ShouldEqual, info.UserID)
+
+		err = store.RemoveByCode(info.Code)
+		So(err, ShouldBeNil)
+
+		cinfo, err = store.GetByCode(info.Code)
+		So(err, ShouldBeNil)
+		So(cinfo, ShouldBeNil)
+	})
+
+	Convey("Test access token store", func() {
+		info := &models.Token{
+			ClientID:        "1",
+			UserID:          "1_1",
+			RedirectURI:     "http://localhost/",
+			Scope:           "all",
+			Access:          "1_1_1",
+			AccessCreateAt:  time.Now(),
+			AccessExpiresIn: time.Second * 5,
+		}
+		err := store.Create(info)
+		So(err, ShouldBeNil)
+
+		ainfo, err := store.GetByAccess(info.GetAccess())
+		So(err, ShouldBeNil)
+		So(ainfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+		err = store.RemoveByAccess(info.GetAccess())
+		So(err, ShouldBeNil)
+
+		ainfo, err = store.GetByAccess(info.GetAccess())
+		So(err, ShouldBeNil)
+		So(ainfo, ShouldBeNil)
+	})
+
+	Convey("Test refresh token store", func() {
+		info := &models.Token{
+			ClientID:         "1",
+			UserID:           "1_2",
+			RedirectURI:      "http://localhost/",
+			Scope:            "all",
+			Access:           "1_2_1",
+			AccessCreateAt:   time.Now(),
+			AccessExpiresIn:  time.Second * 5,
+			Refresh:          "1_2_2",
+			RefreshCreateAt:  time.Now(),
+			RefreshExpiresIn: time.Second * 15,
+		}
+		err := store.Create(info)
+		So(err, ShouldBeNil)
+
+		rinfo, err := store.GetByRefresh(info.GetRefresh())
+		So(err, ShouldBeNil)
+		So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+		err = store.RemoveByRefresh(info.GetRefresh())
+		So(err, ShouldBeNil)
+
+		rinfo, err = store.GetByRefresh(info.GetRefresh())
+		So(err, ShouldBeNil)
+		So(rinfo, ShouldBeNil)
+	})
+
+	Convey("Test TTL", func() {
+		info := &models.Token{
+			ClientID:         "1",
+			UserID:           "1_1",
+			RedirectURI:      "http://localhost/",
+			Scope:            "all",
+			Access:           "1_3_1",
+			AccessCreateAt:   time.Now(),
+			AccessExpiresIn:  time.Second * 1,
+			Refresh:          "1_3_2",
+			RefreshCreateAt:  time.Now(),
+			RefreshExpiresIn: time.Second * 1,
+		}
+		err := store.Create(info)
+		So(err, ShouldBeNil)
+
+		time.Sleep(time.Second * 5)
+		ainfo, err := store.GetByAccess(info.Access)
+		So(err, ShouldBeNil)
+		So(ainfo, ShouldBeNil)
+		rinfo, err := store.GetByRefresh(info.Refresh)
+		So(err, ShouldBeNil)
+		So(rinfo, ShouldBeNil)
+	})
+}

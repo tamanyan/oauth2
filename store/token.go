@@ -116,18 +116,19 @@ func (s *Store) gc() {
 	for range s.ticker.C {
 		now := time.Now().Unix()
 		var count int
+		tokenGCWaitgroup.Add(1)
 		// log.Println(s.db.HasTable(s.tableName))
 		if err := s.db.Table(s.tableName).Where("expired_at < ?", now).Where("deleted_at IS NULL").Count(&count).Error; err != nil {
 			s.errorf("[ERROR]:%s\n", err)
+			tokenGCWaitgroup.Done()
 			return
 		}
 		if count > 0 {
-			tokenGCWaitgroup.Add(1)
 			if err := s.db.Table(s.tableName).Where("expired_at < ?", now).Where("deleted_at IS NULL").Delete(&StoreItem{}).Error; err != nil {
 				s.errorf("[ERROR]:%s\n", err)
 			}
-			tokenGCWaitgroup.Done()
 		}
+		tokenGCWaitgroup.Done()
 	}
 }
 
@@ -160,17 +161,20 @@ func (s *Store) Create(info oauth2.TokenInfo) error {
 
 // RemoveByCode delete the authorization code
 func (s *Store) RemoveByCode(code string) error {
-	return s.db.Table(s.tableName).Where("code = ?", code).Update("code", "").Error
+	err := s.db.Table(s.tableName).Where("code = ?", code).Delete(&StoreItem{}).Error
+	return err
 }
 
 // RemoveByAccess use the access token to delete the token information
 func (s *Store) RemoveByAccess(access string) error {
-	return s.db.Table(s.tableName).Where("access = ?", access).Update("access", "").Error
+	err := s.db.Table(s.tableName).Where("access = ?", access).Delete(&StoreItem{}).Error
+	return err
 }
 
 // RemoveByRefresh use the refresh token to delete the token information
 func (s *Store) RemoveByRefresh(refresh string) error {
-	return s.db.Table(s.tableName).Where("refresh = ?", refresh).Update("refresh", "").Error
+	err := s.db.Table(s.tableName).Where("refresh = ?", refresh).Delete(&StoreItem{}).Error
+	return err
 }
 
 func (s *Store) toTokenInfo(data string) (oauth2.TokenInfo, error) {

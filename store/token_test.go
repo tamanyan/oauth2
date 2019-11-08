@@ -134,7 +134,7 @@ func testToken(store oauth2.TokenStore) {
 		err := store.Create(info)
 		So(err, ShouldBeNil)
 
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 4)
 		ainfo, err := store.GetByAccess(info.Access)
 		So(err, ShouldBeNil)
 		So(ainfo, ShouldBeNil)

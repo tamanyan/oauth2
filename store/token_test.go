@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -18,24 +19,24 @@ func TestTokenStore(t *testing.T) {
 			DBType:      "sqlite3",
 			TableName:   "oauth2_token",
 			MaxLifetime: time.Second * 1,
-		}, 600)
+		}, 1)
 		So(err, ShouldBeNil)
 		testToken(store)
 		store.Close()
 	})
 
-	// Convey("Test file store", t, func() {
-	// 	os.Remove("data.db")
+	Convey("Test file store", t, func() {
+		os.Remove("data.db")
 
-	// 	store, err := store.NewTokenStore(&store.TokenConfig{
-	// 		DSN:         "data.db",
-	// 		DBType:      "sqlite3",
-	// 		TableName:   "oauth2_token",
-	// 		MaxLifetime: time.Second * 1,
-	// 	}, 2)
-	// 	So(err, ShouldBeNil)
-	// 	testToken(store)
-	// })
+		store, err := store.NewTokenStore(&store.TokenConfig{
+			DSN:         "data.db",
+			DBType:      "sqlite3",
+			TableName:   "oauth2_token",
+			MaxLifetime: time.Second * 1,
+		}, 1)
+		So(err, ShouldBeNil)
+		testToken(store)
+	})
 }
 
 func testToken(store oauth2.TokenStore) {
@@ -47,7 +48,7 @@ func testToken(store oauth2.TokenStore) {
 			Scope:         "all",
 			Code:          "11_11_11",
 			CodeCreateAt:  time.Now(),
-			CodeExpiresIn: time.Second * 5,
+			CodeExpiresIn: time.Second * 20,
 		}
 		err := store.Create(info)
 		So(err, ShouldBeNil)
@@ -72,7 +73,7 @@ func testToken(store oauth2.TokenStore) {
 			Scope:           "all",
 			Access:          "1_1_1",
 			AccessCreateAt:  time.Now(),
-			AccessExpiresIn: time.Second * 5,
+			AccessExpiresIn: time.Second * 20,
 		}
 		err := store.Create(info)
 		So(err, ShouldBeNil)
@@ -97,10 +98,10 @@ func testToken(store oauth2.TokenStore) {
 			Scope:            "all",
 			Access:           "1_2_1",
 			AccessCreateAt:   time.Now(),
-			AccessExpiresIn:  time.Second * 5,
+			AccessExpiresIn:  time.Second * 20,
 			Refresh:          "1_2_2",
 			RefreshCreateAt:  time.Now(),
-			RefreshExpiresIn: time.Second * 15,
+			RefreshExpiresIn: time.Second * 20,
 		}
 		err := store.Create(info)
 		So(err, ShouldBeNil)
@@ -125,10 +126,10 @@ func testToken(store oauth2.TokenStore) {
 			Scope:            "all",
 			Access:           "1_3_1",
 			AccessCreateAt:   time.Now(),
-			AccessExpiresIn:  time.Second * 1,
+			AccessExpiresIn:  time.Millisecond * 1,
 			Refresh:          "1_3_2",
 			RefreshCreateAt:  time.Now(),
-			RefreshExpiresIn: time.Second * 1,
+			RefreshExpiresIn: time.Millisecond * 1,
 		}
 		err := store.Create(info)
 		So(err, ShouldBeNil)

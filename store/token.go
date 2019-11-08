@@ -10,7 +10,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-
 	// _ "github.com/jinzhu/gorm/dialects/postgres"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 
@@ -19,7 +18,7 @@ import (
 )
 
 var noUpdateContent = "No content found to be updated"
-var mutex = &sync.Mutex{}
+var tokenGCWaitgroup = &sync.WaitGroup{}
 
 // StoreItem data item saved into db
 type StoreItem struct {
@@ -117,17 +116,17 @@ func (s *Store) gc() {
 	for range s.ticker.C {
 		now := time.Now().Unix()
 		var count int
-		if err := s.db.Table(s.tableName).Where("expired_at > ?", now).Count(&count).Error; err != nil {
+		// log.Println(s.db.HasTable(s.tableName))
+		if err := s.db.Table(s.tableName).Where("expired_at < ?", now).Where("deleted_at IS NULL").Count(&count).Error; err != nil {
 			s.errorf("[ERROR]:%s\n", err)
 			return
 		}
-		s.errorf("DELETE:%d\n", count)
 		if count > 0 {
-			if err := s.db.Table(s.tableName).Where("expired_at > ?", now).Delete(&StoreItem{}).Error; err != nil {
+			tokenGCWaitgroup.Add(1)
+			if err := s.db.Table(s.tableName).Where("expired_at < ?", now).Where("deleted_at IS NULL").Delete(&StoreItem{}).Error; err != nil {
 				s.errorf("[ERROR]:%s\n", err)
-			} else {
-				s.errorf("DELETE:%d\n", count)
 			}
+			tokenGCWaitgroup.Done()
 		}
 	}
 }
@@ -186,6 +185,8 @@ func (s *Store) GetByCode(code string) (oauth2.TokenInfo, error) {
 		return nil, nil
 	}
 
+	tokenGCWaitgroup.Wait()
+
 	var item StoreItem
 	if err := s.db.Table(s.tableName).Where("code = ?", code).Find(&item).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
@@ -202,6 +203,8 @@ func (s *Store) GetByAccess(access string) (oauth2.TokenInfo, error) {
 		return nil, nil
 	}
 
+	tokenGCWaitgroup.Wait()
+
 	var item StoreItem
 	if err := s.db.Table(s.tableName).Where("access = ?", access).Find(&item).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
@@ -209,6 +212,7 @@ func (s *Store) GetByAccess(access string) (oauth2.TokenInfo, error) {
 		}
 		return nil, err
 	}
+
 	return s.toTokenInfo(item.Data)
 }
 
@@ -217,6 +221,8 @@ func (s *Store) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
 	if refresh == "" {
 		return nil, nil
 	}
+
+	tokenGCWaitgroup.Wait()
 
 	var item StoreItem
 	if err := s.db.Table(s.tableName).Where("refresh = ?", refresh).Find(&item).Error; err != nil {
